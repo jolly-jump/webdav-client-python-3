@@ -723,7 +723,14 @@ class Client(object):
                 self.pull(remote_directory=remote_path, local_directory=local_path)
             else:
                 if remote_resource_name in local_resource_names:
-                    continue
+                    # self.info() checks the remote_urn, which is not necessary, since
+                    localsize = os.path.getsize(local_path)
+                    response = self.execute_request(action='info', path=remote_urn.quote())
+                    info = WebDavXmlUtils.parse_info_response(content=response.content, path=self.get_full_path(remote_urn), hostname=self.webdav.hostname)
+                    if (str(info['size']) == str(localsize)):
+                        #print("{:s} ({:s}) has same size as {:s} ({:d})".format(remote_path,info['size'],local_path,localsize))
+                        continue
+                #print("Downloading {:s} ".format(remote_path))
                 self.download_file(remote_path=remote_path, local_path=local_path)
                 updated=True
         return updated
