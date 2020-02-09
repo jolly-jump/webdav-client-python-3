@@ -7,6 +7,7 @@ import shutil
 import threading
 from io import BytesIO
 from re import sub
+import dateutil.parser
 
 import lxml.etree as etree
 import requests
@@ -701,7 +702,9 @@ class Client(object):
         local_resource_names = listdir(local_directory)
 
         ## here we get all files and directories in the current directory
+        print("get paths start..", end='')
         paths = self.list(urn.path())
+        print("finished")
         expression = "{begin}{end}".format(begin="^", end=remote_directory)
         remote_resource_names = prune(paths, expression)
 
@@ -725,12 +728,21 @@ class Client(object):
                 if remote_resource_name in local_resource_names:
                     # self.info() checks the remote_urn, which is not necessary, since
                     localsize = os.path.getsize(local_path)
+                    localmtime = os.path.getmtime(local_path)
                     response = self.execute_request(action='info', path=remote_urn.quote())
                     info = WebDavXmlUtils.parse_info_response(content=response.content, path=self.get_full_path(remote_urn), hostname=self.webdav.hostname)
+                    remotemtime = dateutil.parser.parse(info['modified'], fuzzy=True, dayfirst=False).timestamp()
                     if (str(info['size']) == str(localsize)):
                         #print("{:s} ({:s}) has same size as {:s} ({:d})".format(remote_path,info['size'],local_path,localsize))
-                        continue
-                #print("Downloading {:s} ".format(remote_path))
+                        if ( round(remotemtime) <= round(localmtime)):
+                            #print("{:s} ({:f}) is older than {:s} ({:f}). Not downloading.".format(remote_path,remotemtime,local_path,localmtime))
+                            continue
+                        else:
+                            print("Downloading {:s} since {:s} ({:d}) is younger than {:s} ({:d}.".format(remote_path,remote_path,round(remotemtime),local_path,round(localmtime)))
+                    else:
+                        print("Downloading {:s} since file size differs.".format(remote_path))
+                else:
+                    print("Downloading new file {:s}".format(remote_path))
                 self.download_file(remote_path=remote_path, local_path=local_path)
                 updated=True
         return updated
